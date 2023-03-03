@@ -1,0 +1,29 @@
+LCONF_VERSION = "7"
+
+BBPATH = "${TOPDIR}"
+BBFILES ?= ""
+
+BBLAYERS ?= " \
+    ##OEROOT##/../poky/meta \
+    ##OEROOT##/../poky/meta-poky \
+    ##OEROOT##/../meta-openembedded/meta-perl \
+    ##OEROOT##/../meta-openembedded/meta-python \
+    ##OEROOT##/../meta-openembedded/meta-filesystems \
+    ##OEROOT##/../meta-openembedded/meta-multimedia \
+    ##OEROOT##/../meta-openembedded/meta-networking \
+    ##OEROOT##/../meta-openembedded/meta-webserver \
+    ##OEROOT##/../meta-openembedded/meta-initramfs \
+    ##OEROOT##/../meta-openembedded/meta-oe \
+    ##OEROOT##/../meta-xilinx/meta-xilinx-core \
+    ##OEROOT##/../meta-xilinx/meta-xilinx-bsp \
+    ##OEROOT##/../meta-xilinx/meta-xilinx-pynq \
+    ##OEROOT##/../meta-xilinx/meta-xilinx-contrib \
+    ##OEROOT##/../meta-xilinx/meta-xilinx-standalone \
+    ##OEROOT##/../meta-xilinx/meta-xilinx-vendor \
+    ##OEROOT##/../meta-xilinx-tools \
+    ##OEROOT##/../../meta-custom_project \
+"
+
+BBLAYERS_NON_REMOVABLE ?= " \
+    ##OEROOT##/../poky/meta \
+"
