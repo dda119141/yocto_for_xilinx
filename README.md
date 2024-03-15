@@ -14,8 +14,8 @@ Getting Started
     ```bash
     ./fetch_external_sources.sh
 
-1. Yocto environment for Xilinx Zynq zcu102 can be souced and bibake commands can
-   be executed. For instance if the custom_project minimal image has to be built, do:
+1. Yocto environment for Xilinx Zynq zcu102 can be sourced. This action enables bibatke commands to
+   be executed. For instance if the custom_project minimal image has to be built, do the following:
     ```bash
     . setup_custom_project generated/
     bitbake custom_project-image-minimal
