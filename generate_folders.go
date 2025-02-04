@@ -34,17 +34,6 @@ func getBuildCurrentDir() string {
 	return dir
 }
 
-// Display usage information
-func usage() {
-	log.Println("build.go is a wrapper for executing bitbake tasks.")
-	log.Println("Options:")
-	log.Println("-c | --component <component> component to build")
-	log.Println("-s | --source_link create symlink source folder.")
-	log.Println("-b | --build_link create symlink build folder.")
-	log.Println("-i | --install_link create symlink install folder.")
-	log.Println("-h | --help show help")
-}
-
 // RunCommand runs a bash command and returns the output as a string.
 // It takes a command string as input and returns a string and an error if any.
 func RunCommand(command string) (string, error) {
@@ -58,15 +47,15 @@ func RunCommand(command string) (string, error) {
 }
 
 // getFolderFromRecipe retrieves a folder path from a Yocto recipe output.
-func getFolderFromRecipe(baseDir, component, prefix string) (string, error) {
-	setupCmd := "source " + baseDir + "setup_custom_project " + generatedDir
-	output, err := RunCommand(setupCmd)
-	if err != nil {
-		return "", err
+func getFolderFromRecipe(component, prefix string) (string, error) {
+	setupCmd := "source " + buildCurDir + "setup_custom_project " + generatedDir
+	_, err1 := RunCommand(setupCmd)
+	if err1 != nil {
+		return "", err1
 	}
 
 	bitbakeCmd := "bitbake -e " + component
-	output, err = RunCommand(bitbakeCmd)
+	output, err := RunCommand(bitbakeCmd)
 	if err != nil {
 		return "", err
 	}
@@ -97,14 +86,14 @@ func removeNotRelevantChar(dir string, prefix string) (string, error) {
 }
 
 // Build component
-func doBuild(currentDir string, component string) (string, error) {
+func doBuild(component string) (string, error) {
 	setupCmd := "source " + buildCurDir + "setup_custom_project " + generatedDir
 	_, err := RunCommand(setupCmd)
 	if err != nil {
 		return "", err
 	}
 
-	cmd := "bitbake -e " + component
+	cmd := "bitbake " + component
 	result, err := RunCommand(cmd)
 	if err != nil {
 		return "", err
@@ -116,7 +105,7 @@ func doBuild(currentDir string, component string) (string, error) {
 // Retrieve component source path
 func doGetSources(sourceFolder string, component string) (string, error) {
 
-	folder, err := getFolderFromRecipe(sourceFolder, component, "^S=")
+	folder, err := getFolderFromRecipe(component, "^S=")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,18 +125,18 @@ func doGetSources(sourceFolder string, component string) (string, error) {
 }
 
 // Retrieve component install path
-func doGetInstallFolder(sourceFolder string, component string) (string, error) {
-	folder, err := getFolderFromRecipe(sourceFolder, component, "^D=")
+func doGetInstallFolder(installFolder string, component string) (string, error) {
+	folder, err := getFolderFromRecipe(component, "^D=")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//append sourceFolder path to buildCurDir
-	sourceFolder = filepath.Join(buildCurDir, sourceFolder)
+	installFolder = filepath.Join(buildCurDir, installFolder)
 
 	// create symbolic link from folder into sources folder
-	log.Printf("create symbolic link from %s into %s", folder, sourceFolder)
-	err = os.Symlink(folder, sourceFolder)
+	log.Printf("create symbolic link from %s into %s", folder, installFolder)
+	err = os.Symlink(folder, installFolder)
 
 	if err != nil {
 		log.Fatal(err)
@@ -157,18 +146,18 @@ func doGetInstallFolder(sourceFolder string, component string) (string, error) {
 }
 
 // Retrieve component build path
-func doGetBuildFolder(sourceFolder string, component string) (string, error) {
-	folder, err := getFolderFromRecipe(sourceFolder, component, "^B=")
+func doGetBuildFolder(buildFolderArg string, component string) (string, error) {
+	folder, err := getFolderFromRecipe(component, "^B=")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//append sourceFolder path to buildCurDir
-	sourceFolder = filepath.Join(buildCurDir, sourceFolder)
+	buildFolderArg = filepath.Join(buildCurDir, buildFolderArg)
 
 	// create symbolic link from folder into sources folder
-	log.Printf("create symbolic link from %s into %s", folder, sourceFolder)
-	err = os.Symlink(folder, sourceFolder)
+	log.Printf("create symbolic link from %s into %s", folder, buildFolderArg)
+	err = os.Symlink(folder, buildFolderArg)
 
 	if err != nil {
 		log.Fatal(err)
@@ -180,67 +169,57 @@ func doGetBuildFolder(sourceFolder string, component string) (string, error) {
 // doPrepare processes command-line arguments and calls the appropriate functions.
 func doPrepare() error {
 
-	fmt.Errorf("no arguments sdfdfdsgddgs")
+	gComponent := flag.String("c", "", "<component> component to build")
+	sourcedComponent := flag.String("s", "", "<component> create symlink source folder.")
+	flag.StringVar(sourcedComponent, "source_link", "", "<component> create symlink source folder.")
+	builtComponent := flag.String("b", "", "--build_link create symlink build folder for component.")
+	installedComponent := flag.String("i", "", "--install_link create symlink install folder for component.")
 
 	flag.Parse()
+	if *gComponent != "" {
+		result, err := doBuild(*gComponent)
+		if err != nil {
+			return err
+		}
 
-	if flag.NArg() == 0 {
-		return fmt.Errorf("no arguments provided")
+		log.Print(result)
+
+	}
+
+	if *sourcedComponent != "" {
+		result, err := doGetSources(buildDir, *sourcedComponent)
+		if err != nil {
+			return err
+		}
+
+		log.Printf("Sources component %s into %s", buildDir, result)
+
+	}
+	if *builtComponent != "" {
+
+		buildLink, err := doGetBuildFolder(buildCurDir, buildDir)
+		if err != nil {
+			return err
+		}
+
+		log.Printf("Created build link %s pointing to %s", buildDir, buildLink)
+	}
+	if *installedComponent != "" {
+
+		installLink, err := doGetInstallFolder(buildCurDir, installDir)
+		if err != nil {
+			return err
+		}
+
+		log.Printf("Created install link %s pointing to %s", installDir, installLink)
 	}
 
 	for _, arg := range flag.Args() {
 		switch {
-		case strings.HasPrefix(arg, "-c"):
-			componentArg := flag.Arg(1)
-			if componentArg == "" {
-				return fmt.Errorf("-c requires a component name")
-			}
-
-			component, err := doBuild(buildCurDir, componentArg)
-			if err != nil {
-				return err
-			}
-
-			log.Printf("Built component %s into %s", componentArg, component)
-		case strings.HasPrefix(arg, "-s"):
-
-			componentArg := flag.Arg(1)
-			if componentArg == "" {
-				return fmt.Errorf("-c requires a component name")
-			}
-
-			component, err := doGetSources(buildCurDir, componentArg)
-			if err != nil {
-				return err
-			}
-
-			log.Printf("Sources component %s into %s", componentArg, component)
-		case strings.HasPrefix(arg, "-b"):
-			buildLinkArg := flag.Arg(1)
-			if buildLinkArg == "" {
-				return fmt.Errorf("-b requires a build link name")
-			}
-
-			buildLink, err := doGetBuildFolder(buildCurDir, buildLinkArg)
-			if err != nil {
-				return err
-			}
-
-			log.Printf("Created build link %s pointing to %s", buildLinkArg, buildLink)
-		case strings.HasPrefix(arg, "-i"):
-			installLinkArg := flag.Arg(1)
-			if installLinkArg == "" {
-				return fmt.Errorf("-i requires an install link name")
-			}
-
-			installLink, err := doGetInstallFolder(buildCurDir, installLinkArg)
-			if err != nil {
-				return err
-			}
-
-			log.Printf("Created install link %s pointing to %s", installLinkArg, installLink)
+		case strings.HasPrefix(arg, "--help"):
 		case strings.HasPrefix(arg, "-h"):
-			usage()
+			log.Println("wrapper for executing bitbake tasks.")
+			flag.Usage()
 			return fmt.Errorf("help requested")
 		default:
 			return fmt.Errorf("unknown argument: %s", arg)
