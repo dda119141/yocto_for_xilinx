@@ -54,7 +54,8 @@ func getFolderFromRecipe(component, prefix string) (string, error) {
 		return "", err1
 	}
 
-	bitbakeCmd := "bitbake -e " + component
+	bitbakeCmd := "bitbake -e " + component + " | grep " + prefix
+
 	output, err := RunCommand(bitbakeCmd)
 	if err != nil {
 		return "", err
