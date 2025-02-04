@@ -87,11 +87,17 @@ func doFetchRepos() {
 	}
 }
 
-func main() {
+// execu main function only if the file is run directly.
+func execute_main() {
 	if _, err := os.Stat(externalDir); os.IsNotExist(err) {
 		os.Mkdir(externalDir, os.ModePerm)
 	}
 
 	doInstallHostPackages()
 	doFetchRepos()
+}
+
+// if the file is run independently then execute the main function.
+func main() {
+	execute_main()
 }
