@@ -1,7 +1,7 @@
 custom_project Yocto repo for the Yocto Base Build System
 =============================================
 
-This repository provides files to setup and wrapper_bitbake the Yocto base system for
+This repository provides files to setup and build the Yocto base system for
 supported custom custom_project products. The external source repositories are from the latest
 yocto honister branch. Additionally, this repository can also be prepared for
 installing debian packages from binaries/files being hosted in artifactory.
