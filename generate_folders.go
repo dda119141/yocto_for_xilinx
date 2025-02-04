@@ -168,62 +168,55 @@ func doGetBuildFolder(buildFolderArg string, component string) (string, error) {
 
 // doPrepare processes command-line arguments and calls the appropriate functions.
 func doPrepare() error {
-
-	gComponent := flag.String("c", "", "<component> component to build")
-	sourcedComponent := flag.String("s", "", "<component> create symlink source folder.")
-	flag.StringVar(sourcedComponent, "source_link", "", "<component> create symlink source folder.")
-	builtComponent := flag.String("b", "", "--build_link create symlink build folder for component.")
-	installedComponent := flag.String("i", "", "--install_link create symlink install folder for component.")
+	component := flag.String("c", "", "component to build")
+	sourceComponent := flag.String("s", "", "create symlink source folder for component")
+	buildComponent := flag.String("b", "", "create symlink build folder for component")
+	installComponent := flag.String("i", "", "create symlink install folder for component")
 
 	flag.Parse()
-	if *gComponent != "" {
-		result, err := doBuild(*gComponent)
+
+	if *component != "" {
+		_, err := doBuild(*component)
 		if err != nil {
 			return err
 		}
-
-		log.Print(result)
-
 	}
 
-	if *sourcedComponent != "" {
-		result, err := doGetSources(buildDir, *sourcedComponent)
+	if *sourceComponent != "" {
+		_, err := doGetSources(sourceDir, *sourceComponent)
 		if err != nil {
 			return err
 		}
-
-		log.Printf("Sources component %s into %s", buildDir, result)
-
 	}
-	if *builtComponent != "" {
 
-		buildLink, err := doGetBuildFolder(buildCurDir, buildDir)
+	if *buildComponent != "" {
+		_, err := doGetBuildFolder(buildDir, *buildComponent)
 		if err != nil {
 			return err
 		}
-
-		log.Printf("Created build link %s pointing to %s", buildDir, buildLink)
 	}
-	if *installedComponent != "" {
 
-		installLink, err := doGetInstallFolder(buildCurDir, installDir)
+	if *installComponent != "" {
+		_, err := doGetInstallFolder(installDir, *installComponent)
 		if err != nil {
 			return err
 		}
-
-		log.Printf("Created install link %s pointing to %s", installDir, installLink)
 	}
 
 	for _, arg := range flag.Args() {
 		switch {
 		case strings.HasPrefix(arg, "--help"):
 		case strings.HasPrefix(arg, "-h"):
-			log.Println("wrapper for executing bitbake tasks.")
 			flag.Usage()
 			return fmt.Errorf("help requested")
 		default:
+			flag.Usage()
 			return fmt.Errorf("unknown argument: %s", arg)
 		}
+	}
+	if flag.NArg() == 0 {
+		flag.Usage()
+		return fmt.Errorf("missing argument")
 	}
 
 	return nil
