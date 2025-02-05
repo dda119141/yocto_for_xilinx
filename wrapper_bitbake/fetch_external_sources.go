@@ -1,4 +1,4 @@
-package main
+package wrapper_bitbake
 
 import (
 	"fmt"
@@ -39,15 +39,19 @@ func runCommand(command string) error {
 	return nil
 }
 
-func doInstallHostPackages() {
+// doInstallHostPackages installs the required packages on the host.
+// It takes no arguments and returns an error if any.
+func doInstallHostPackages() error {
 	for _, tool := range hostTools {
 		if !isInstalled(tool) {
 			log.Printf("%s to be installed on host\n", tool)
 			if err := runCommand(fmt.Sprintf("sudo apt install -y %s", tool)); err != nil {
-				log.Println(err)
+				log.Printf("Error installing %s: %v\n", tool, err)
+				return err
 			}
 		}
 	}
+	return nil
 }
 
 func isInstalled(tool string) bool {
@@ -71,10 +75,12 @@ func doCheckIfRepoExists(repo string) bool {
 	return true
 }
 
-func doFetchRepos() {
+// doFetchRepos clones the specified repositories if they don't already exist.
+// It takes no arguments and returns an error if any.
+func doFetchRepos() error {
 	if _, err := os.Stat(externalDir); !os.IsNotExist(err) {
 		log.Printf("The directory %s already exists. Skipping repository cloning.\n", externalDir)
-		return
+		return nil
 	}
 
 	for _, repo := range arrayRepos {
@@ -82,17 +88,30 @@ func doFetchRepos() {
 		if !doCheckIfRepoExists(repo) {
 			if err := runCommand(fmt.Sprintf("git clone %s -b %s %s", repoCloneURL, xilinxBranch, externalDir)); err != nil {
 				log.Printf("Error cloning repository %s: %v\n", repo, err)
+				return err
 			}
 		}
 	}
+	return nil
 }
 
-// execu main function only if the file is run directly.
-func install_zynq_repos() {
+// installZynqRepos installs the required packages and clones the Xilinx repositories.
+//
+// It takes no arguments and returns an error if any.
+func InstallZynqRepos() error {
 	if _, err := os.Stat(externalDir); os.IsNotExist(err) {
-		os.Mkdir(externalDir, os.ModePerm)
+		if err = os.Mkdir(externalDir, os.ModePerm); err != nil {
+			return err
+		}
 	}
 
-	doInstallHostPackages()
-	doFetchRepos()
+	if err := doInstallHostPackages(); err != nil {
+		return err
+	}
+
+	if err := doFetchRepos(); err != nil {
+		return err
+	}
+
+	return nil
 }
