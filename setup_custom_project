@@ -6,4 +6,5 @@ else
 	export ROOT=$(readlink -f ${PWD})
 fi
 
+export TEMPLATECONF=$ROOT/meta-custom_project/conf/ 
 TEMPLATECONF=$ROOT/meta-custom_project/conf/ source $ROOT/external/poky/oe-init-build-env "$@"

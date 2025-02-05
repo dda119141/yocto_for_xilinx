@@ -9,15 +9,14 @@ import (
 	"strings"
 )
 
-// Constant variables
-const (
-	reC = `^[0-9]+$`
-)
-
 // buildDirsFromCurDir returns a struct containing the directories relative to the provided curdir.
 //
 // It takes a string as input and returns a Directories struct.
 func BuildDirsFromCurDir(curdir string) Directories {
+	linkDir := filepath.Join(curdir, "links")
+	if _, err := os.Stat(linkDir); os.IsNotExist(err) {
+		os.Mkdir(filepath.Join(curdir, "links"), os.ModePerm)
+	}
 	return Directories{
 		buildDir:     filepath.Join(curdir, "links", "builds"),
 		installDir:   filepath.Join(curdir, "links", "install"),
@@ -56,11 +55,14 @@ func (d Directories) getTopDir() string {
 // It takes a command string as input and returns a string and an error if any.
 func RunCommand(command string) (string, error) {
 	cmd := exec.Command("bash", "-c", command)
-	output, err := cmd.CombinedOutput()
+	log.Printf("::::: %s \n", cmd)
+
+	output, err := cmd.Output()
 	if err != nil {
 		log.Printf("error executing command %s: %v\nOutput: %s", command, err, output)
 		return "", err
 	}
+	log.Println(output)
 	return string(output), nil
 }
 
@@ -86,7 +88,7 @@ func getFolderFromRecipe(component string, d Directories, prefix string) (string
 		return "", err
 	}
 
-	cleanedOutput, err := removeNotRelevantChar(output, prefix)
+	cleanedOutput, err := removePrefixAndQuotes(output, prefix)
 	if err != nil {
 		return "", err
 	}
@@ -94,21 +96,26 @@ func getFolderFromRecipe(component string, d Directories, prefix string) (string
 	return cleanedOutput, nil
 }
 
-// removeNotRelevantChar removes the prefix and double quotes (") from the directory path.
-// It takes a string and a string as input and returns a string and an error if any.
-func removeNotRelevantChar(dir string, prefix string) (string, error) {
+func removeLeftOfFirstSlash(dir string) string {
+	index := strings.Index(dir, "/")
+	if index == -1 {
+		return dir // No slash found, return original string
+	}
+	return dir[index:] // Found slash, return string from slash onwards
+}
+
+// removePrefixAndQuotes removes the prefix and double quotes from the directory path.
+func removePrefixAndQuotes(dir string, prefix string) (string, error) {
 	// Remove double quotes from dir
-	dir = strings.ReplaceAll(dir, "\"", "")
+	quotedDir := strings.ReplaceAll(dir, "\"", "")
 
 	// Remove prefix from dir
-	dir = strings.TrimPrefix(dir, prefix)
+	unprefixedDir := strings.TrimPrefix(quotedDir, prefix)
 
 	// Remove any character in left of dir string until first forward slash
-	dir = strings.TrimLeft(dir, "/")
+	finalDir := removeLeftOfFirstSlash(unprefixedDir)
 
-	log.Printf("removeNotRelevantChar: dir is %s", dir)
-
-	return dir, nil
+	return finalDir, nil
 }
 
 // Build component
@@ -146,15 +153,18 @@ func DoGetSources(d Directories, component string) (string, error) {
 		log.Fatal(err)
 	}
 
+	// make path from folder
+	folderPath := filepath.Clean(folder)
+
 	// create symbolic link from folder into sources folder
-	log.Printf("create symbolic link from %s into %s", folder, d.getSourceDir())
-	err = os.Symlink(folder, d.getSourceDir())
+	log.Printf("create symbolic link from %s into %s", folderPath, d.getSourceDir())
+	err = os.Symlink(folderPath, d.getSourceDir())
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return folder, nil
+	return folderPath, nil
 }
 
 // Retrieve component install path
@@ -168,16 +178,18 @@ func DoGetInstallFolder(d Directories, component string) (string, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// make path from folder
+	folderPath := filepath.Clean(folder)
 
 	// create symbolic link from folder into sources folder
-	log.Printf("create symbolic link from %s into %s", folder, d.getInstallDir())
-	err = os.Symlink(folder, d.getInstallDir())
+	log.Printf("create symbolic link from %s into %s", folderPath, d.getInstallDir())
+	err = os.Symlink(folderPath, d.getInstallDir())
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return folder, nil
+	return folderPath, nil
 }
 
 // Retrieve component build path
@@ -192,13 +204,16 @@ func DoGetBuildFolder(d Directories, component string) (string, error) {
 		log.Fatal(err)
 	}
 
-	// create symbolic link from folder into sources folder
-	log.Printf("create symbolic link from %s into %s", folder, d.getBuildDir())
-	err = os.Symlink(folder, d.getBuildDir())
+	//make path from folder
+	folderPath := filepath.Clean(folder)
+
+	//create symbolic link from folder into sources folder
+	log.Printf("create symbolic link from %s into %s", folderPath, d.getBuildDir())
+	err = os.Symlink(folderPath, d.getBuildDir())
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return folder, nil
+	return folderPath, nil
 }
