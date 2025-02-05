@@ -15,21 +15,14 @@ const (
 )
 
 var (
-	curDir      = getCurrentDir()
-	arrayRepos  = []string{"meta-xilinx", "meta-openembedded", "poky", "meta-xilinx-tools", "meta-xilinx-tsn"}
-	externalDir = filepath.Join(curDir, "external")
-	hostTools   = []string{"gawk", "wget", "git", "diffstat", "unzip", "texinfo", "gcc", "build-essential", "chrpath", "socat", "cpio", "python3", "python3-pip", "python3-pexpect", "xz-utils", "debianutils", "iputils-ping", "python3-git", "python3-jinja2", "libegl1-mesa", "libsdl1.2-dev", "pylint3", "xterm", "python3-subunit", "mesa-common-dev", "zstd", "liblz4-tool"}
+	arrayRepos = []string{"meta-xilinx", "meta-openembedded", "poky", "meta-xilinx-tools", "meta-xilinx-tsn"}
+	hostTools  = []string{"gawk", "wget", "git", "diffstat", "unzip", "texinfo", "gcc", "build-essential", "chrpath", "socat", "cpio", "python3", "python3-pip", "python3-pexpect", "xz-utils", "debianutils", "iputils-ping", "python3-git", "python3-jinja2", "libegl1-mesa", "libsdl1.2-dev", "pylint3", "xterm", "python3-subunit", "mesa-common-dev", "zstd", "liblz4-tool"}
 )
 
-func getCurrentDir() string {
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal("Error getting current directory:", err)
-	}
-	return dir
-}
-
 func runCommand(command string) error {
+	//log the command
+	log.Printf("Running command: %s\n", command)
+
 	cmd := exec.Command("bash", "-c", command)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -64,52 +57,68 @@ func isInstalled(tool string) bool {
 	return strings.Contains(string(output), tool)
 }
 
-func doCheckIfRepoExists(repo string) bool {
-	dir := filepath.Join(externalDir, repo)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
+func repoExists(repo string, d Directories) bool {
+	repoDir := filepath.Join(d.getTopDir(), "external", repo)
+	if _, err := os.Stat(repoDir); os.IsNotExist(err) {
 		return false
 	}
-	if err := runCommand(fmt.Sprintf("git -C %s remote -v", dir)); err != nil {
+
+	if err := runCommand(fmt.Sprintf("git -C %s remote -v", repoDir)); err != nil {
 		return false
 	}
+
 	return true
 }
 
 // doFetchRepos clones the specified repositories if they don't already exist.
 // It takes no arguments and returns an error if any.
-func doFetchRepos() error {
-	if _, err := os.Stat(externalDir); !os.IsNotExist(err) {
-		log.Printf("The directory %s already exists. Skipping repository cloning.\n", externalDir)
-		return nil
-	}
+func doFetchRepos(d Directories) error {
+	externalDir := filepath.Join(d.getTopDir(), "external")
 
-	for _, repo := range arrayRepos {
-		repoCloneURL := xilinxGit + repo + ".git"
-		if !doCheckIfRepoExists(repo) {
-			if err := runCommand(fmt.Sprintf("git clone %s -b %s %s", repoCloneURL, xilinxBranch, externalDir)); err != nil {
-				log.Printf("Error cloning repository %s: %v\n", repo, err)
-				return err
-			}
+	if _, err := os.Stat(externalDir); os.IsNotExist(err) {
+		log.Printf("Creating directory: %s\n", externalDir)
+		if err := os.Mkdir(externalDir, 0755); err != nil {
+			return err
 		}
 	}
+
+	for _, repoName := range arrayRepos {
+		repoURL := xilinxGit + repoName + ".git"
+		repoPath := filepath.Join(externalDir, repoName)
+		if !repoExists(repoName, d) {
+			log.Printf("Cloning repository: %s\n", repoName)
+			if err := runCommand(fmt.Sprintf("git clone %s -b %s %s", repoURL, xilinxBranch, repoPath)); err != nil {
+				return fmt.Errorf("failed to clone repository %s: %w", repoName, err)
+			}
+		} else {
+			log.Printf("Repository %s already exists. Skipping...\n", repoName)
+		}
+	}
+	log.Println("All repositories processed successfully")
 	return nil
 }
 
 // installZynqRepos installs the required packages and clones the Xilinx repositories.
 //
 // It takes no arguments and returns an error if any.
-func InstallZynqRepos() error {
+func InstallZynqRepos(d Directories) error {
+	externalDir := filepath.Join(d.getTopDir(), "external")
+
 	if _, err := os.Stat(externalDir); os.IsNotExist(err) {
 		if err = os.Mkdir(externalDir, os.ModePerm); err != nil {
 			return err
 		}
+	} else {
+		log.Printf("installZynqRepos: The directory %s already exists. Skipping directory creation.", externalDir)
 	}
 
 	if err := doInstallHostPackages(); err != nil {
+		log.Printf("installZynqRepos: Error installing required packages: %v", err)
 		return err
 	}
 
-	if err := doFetchRepos(); err != nil {
+	if err := doFetchRepos(d); err != nil {
+		log.Printf("installZynqRepos: Error cloning repositories: %v", err)
 		return err
 	}
 

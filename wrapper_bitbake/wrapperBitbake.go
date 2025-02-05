@@ -73,7 +73,7 @@ func getFolderFromRecipe(component string, d Directories, prefix string) (string
 		return "", errors.New("directories not initialized")
 	}
 
-	setupCmd := "source " + d.getTopDir() + "setup_custom_project " + d.getGeneratedDir()
+	setupCmd := "source " + d.getTopDir() + "/setup_custom_project " + d.getGeneratedDir()
 	_, err1 := RunCommand(setupCmd)
 	if err1 != nil {
 		return "", err1
@@ -118,7 +118,7 @@ func DoBuild(d Directories, component string) (string, error) {
 		return "", errors.New("directories not initialized")
 	}
 
-	setupCmd := "source " + d.getTopDir() + "setup_custom_project " + d.getGeneratedDir()
+	setupCmd := "source " + d.getTopDir() + "/setup_custom_project " + d.getGeneratedDir()
 	_, err := RunCommand(setupCmd)
 	if err != nil {
 		return "", err

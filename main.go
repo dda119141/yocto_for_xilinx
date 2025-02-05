@@ -2,10 +2,8 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
-	"strings"
 	"yocto_for_xilinx/wrapper_bitbake"
 )
 
@@ -19,7 +17,8 @@ func GetBuildCurrentDir() string {
 
 // doPrepare processes command-line arguments and calls the appropriate functions.
 func doPrepare() error {
-	component := flag.String("c", "", "component to build")
+	component := flag.String("c", "", "component to build using bitbake")
+	helpcomponent := flag.String("h", "", "provide help for component")
 	sourceComponent := flag.String("s", "", "create symlink source folder for component")
 	buildComponent := flag.String("b", "", "create symlink build folder for component")
 	installComponent := flag.String("i", "", "create symlink install folder for component")
@@ -34,50 +33,31 @@ func doPrepare() error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if *sourceComponent != "" {
+	} else if *sourceComponent != "" {
 		_, err := wrapper_bitbake.DoGetSources(dires, *sourceComponent)
 		if err != nil {
 			return err
 		}
-	}
-
-	if *buildComponent != "" {
+	} else if *buildComponent != "" {
 		_, err := wrapper_bitbake.DoGetBuildFolder(dires, *buildComponent)
 		if err != nil {
 			return err
 		}
-	}
-
-	if *installComponent != "" {
+	} else if *installComponent != "" {
 		_, err := wrapper_bitbake.DoGetInstallFolder(dires, *installComponent)
 		if err != nil {
 			return err
 		}
-	}
-	if *fetchCmd != "" {
+	} else if *fetchCmd != "" {
 		// execute install_zynq_repo function from fetch_external_sources.go
-		err := wrapper_bitbake.InstallZynqRepos()
+		err := wrapper_bitbake.InstallZynqRepos(dires)
 		if err != nil {
 			return err
 		}
-	}
-
-	for _, arg := range flag.Args() {
-		switch {
-		case strings.HasPrefix(arg, "--help"):
-		case strings.HasPrefix(arg, "-h"):
-			flag.Usage()
-			return fmt.Errorf("help requested")
-		default:
-			flag.Usage()
-			return fmt.Errorf("unknown argument: %s", arg)
-		}
-	}
-	if flag.NArg() == 0 {
+	} else if *helpcomponent != "" {
 		flag.Usage()
-		return fmt.Errorf("missing argument")
+	} else {
+		flag.Usage()
 	}
 
 	return nil
