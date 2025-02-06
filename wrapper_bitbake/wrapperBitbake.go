@@ -2,6 +2,7 @@ package wrapper_bitbake
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -18,10 +19,11 @@ func BuildDirsFromCurDir(curdir string) Directories {
 		os.Mkdir(filepath.Join(curdir, "links"), os.ModePerm)
 	}
 	return Directories{
-		buildDir:     filepath.Join(curdir, "links", "builds"),
-		installDir:   filepath.Join(curdir, "links", "install"),
-		sourceDir:    filepath.Join(curdir, "links", "sources"),
-		generatedDir: filepath.Join(curdir, "generated"),
+		buildDir:   filepath.Join(curdir, "links", "builds"),
+		installDir: filepath.Join(curdir, "links", "install"),
+		sourceDir:  filepath.Join(curdir, "links", "sources"),
+		// generatedDir: filepath.Join(curdir, "generated"),
+		generatedDir: "/home/max/Work/yocto/xilinx/build_zynq",
 		topdir:       curdir,
 	}
 }
@@ -53,13 +55,13 @@ func (d Directories) getTopDir() string {
 
 // RunCommand runs a bash command and returns the output as a string.
 // It takes a command string as input and returns a string and an error if any.
-func RunCommand(command string) (string, error) {
+func Run_Command(command string) (string, error) {
 	cmd := exec.Command("bash", "-c", command)
-	log.Printf("::::: %s \n", cmd)
+	log.Printf("::: %s :::\n", cmd)
 
 	output, err := cmd.Output()
 	if err != nil {
-		log.Printf("error executing command %s: %v\nOutput: %s", command, err, output)
+		log.Printf("error executing command:: %s :: %v\nOutput: %s", command, err, output)
 		return "", err
 	}
 	log.Println(output)
@@ -78,6 +80,7 @@ func getFolderFromRecipe(component string, d Directories, prefix string) (string
 	setupCmd := "source " + d.getTopDir() + "/setup_custom_project " + d.getGeneratedDir()
 	_, err1 := RunCommand(setupCmd)
 	if err1 != nil {
+		log.Printf("error setting up custom project:: %v\n", err1)
 		return "", err1
 	}
 
@@ -85,11 +88,13 @@ func getFolderFromRecipe(component string, d Directories, prefix string) (string
 
 	output, err := RunCommand(bitbakeCmd)
 	if err != nil {
+		log.Printf("error executing bitbake -e command:: %v\n", err)
 		return "", err
 	}
 
 	cleanedOutput, err := removePrefixAndQuotes(output, prefix)
 	if err != nil {
+		log.Printf("error removePrefixAndQuotes:: %v\n", err)
 		return "", err
 	}
 
@@ -140,80 +145,70 @@ func DoBuild(d Directories, component string) (string, error) {
 	return result, nil
 }
 
-// Retrieve component source path
+// FolderExists checks if the specified folderPath exists and is a directory.
+// It takes a folderPath of type string as input and returns a bool indicating existence.
+func FolderExists(folderPath string) bool {
+	stat, err := os.Stat(folderPath)
+	if err != nil {
+		return false
+	}
+	return stat.IsDir()
+}
+
+// templateFolder retrieves a folder path from a Yocto recipe output.
+// It takes a component and a prefix as input, both of type string, and returns a string and an error if any.
+func templateFolder(d Directories, component string, prefix string) (string, error) {
+	//if d not initialized, return error
+	if d.getTopDir() == "" {
+		return "", errors.New("directories not initialized")
+	}
+
+	folder, err := getFolderFromRecipe(component, d, prefix)
+	if err != nil {
+		return "", err
+	}
+
+	// make path from folder
+	folderPath := filepath.Clean(folder)
+
+	// check if folderPath exists
+	if !FolderExists(folderPath) {
+		return "", fmt.Errorf("the folder path %s does not exist", folderPath)
+	}
+
+	// create symbolic link from folder into sources folder
+	linkPath := ""
+	if prefix == "^S=" {
+		linkPath = d.getSourceDir()
+	} else if prefix == "^D=" {
+		linkPath = d.getInstallDir()
+	} else if prefix == "^B=" {
+		linkPath = d.getBuildDir()
+	} else {
+		return "", fmt.Errorf("prefix %s not supported", prefix)
+	}
+
+	log.Printf("create symbolic link from %s into %s", folderPath, linkPath)
+	err = os.Symlink(folderPath, linkPath)
+
+	if err != nil {
+		return "", err
+	}
+
+	return folderPath, nil
+}
+
+// DoGetSources retrieves a component source path.
 func DoGetSources(d Directories, component string) (string, error) {
-
-	//if d not initialized, return error
-	if d.getTopDir() == "" {
-		return "", errors.New("directories not initialized")
-	}
-
-	folder, err := getFolderFromRecipe(component, d, "^S=")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// make path from folder
-	folderPath := filepath.Clean(folder)
-
-	// create symbolic link from folder into sources folder
-	log.Printf("create symbolic link from %s into %s", folderPath, d.getSourceDir())
-	err = os.Symlink(folderPath, d.getSourceDir())
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return folderPath, nil
+	return templateFolder(d, component, "^S=")
 }
 
-// Retrieve component install path
+// DoGetInstallFolder retrieves a component install path.
 func DoGetInstallFolder(d Directories, component string) (string, error) {
-	//if d not initialized, return error
-	if d.getTopDir() == "" {
-		return "", errors.New("directories not initialized")
-	}
-
-	folder, err := getFolderFromRecipe(component, d, "^D=")
-	if err != nil {
-		log.Fatal(err)
-	}
-	// make path from folder
-	folderPath := filepath.Clean(folder)
-
-	// create symbolic link from folder into sources folder
-	log.Printf("create symbolic link from %s into %s", folderPath, d.getInstallDir())
-	err = os.Symlink(folderPath, d.getInstallDir())
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return folderPath, nil
+	return templateFolder(d, component, "^D=")
 }
 
-// Retrieve component build path
+// DoGetBuildFolder retrieves a component build path.
 func DoGetBuildFolder(d Directories, component string) (string, error) {
-	//if d not initialized, return error
-	if d.getTopDir() == "" {
-		return "", errors.New("directories not initialized")
-	}
-
-	folder, err := getFolderFromRecipe(component, d, "^B=")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//make path from folder
-	folderPath := filepath.Clean(folder)
-
-	//create symbolic link from folder into sources folder
-	log.Printf("create symbolic link from %s into %s", folderPath, d.getBuildDir())
-	err = os.Symlink(folderPath, d.getBuildDir())
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return folderPath, nil
+	return templateFolder(d, component, "^B=")
 }

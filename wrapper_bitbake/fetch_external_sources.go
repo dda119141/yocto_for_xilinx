@@ -19,26 +19,13 @@ var (
 	hostTools  = []string{"gawk", "wget", "git", "diffstat", "unzip", "texinfo", "gcc", "build-essential", "chrpath", "socat", "cpio", "python3", "python3-pip", "python3-pexpect", "xz-utils", "debianutils", "iputils-ping", "python3-git", "python3-jinja2", "libegl1-mesa", "libsdl1.2-dev", "pylint3", "xterm", "python3-subunit", "mesa-common-dev", "zstd", "liblz4-tool"}
 )
 
-func runCommand(command string) error {
-	//log the command
-	log.Printf("Running command: %s\n", command)
-
-	cmd := exec.Command("bash", "-c", command)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("error executing command %s: %v\nOutput: %s", command, err, output)
-		return err
-	}
-	return nil
-}
-
 // doInstallHostPackages installs the required packages on the host.
 // It takes no arguments and returns an error if any.
 func doInstallHostPackages() error {
 	for _, tool := range hostTools {
 		if !isInstalled(tool) {
 			log.Printf("%s to be installed on host\n", tool)
-			if err := runCommand(fmt.Sprintf("sudo apt install -y %s", tool)); err != nil {
+			if _, err := RunCommand(fmt.Sprintf("sudo apt install -y %s", tool)); err != nil {
 				log.Printf("Error installing %s: %v\n", tool, err)
 				return err
 			}
@@ -63,11 +50,14 @@ func repoExists(repo string, d Directories) bool {
 		return false
 	}
 
-	if err := runCommand(fmt.Sprintf("git -C %s remote -v", repoDir)); err != nil {
+	result, err := RunCommand(fmt.Sprintf("git -C %s remote -v", repoDir))
+	if err != nil {
 		return false
 	}
-
-	return true
+	if len(result) > 0 {
+		return true
+	}
+	return false
 }
 
 // doFetchRepos clones the specified repositories if they don't already exist.
@@ -87,7 +77,7 @@ func doFetchRepos(d Directories) error {
 		repoPath := filepath.Join(externalDir, repoName)
 		if !repoExists(repoName, d) {
 			log.Printf("Cloning repository: %s\n", repoName)
-			if err := runCommand(fmt.Sprintf("git clone %s -b %s %s", repoURL, xilinxBranch, repoPath)); err != nil {
+			if _, err := RunCommand(fmt.Sprintf("git clone %s -b %s %s", repoURL, xilinxBranch, repoPath)); err != nil {
 				return fmt.Errorf("failed to clone repository %s: %w", repoName, err)
 			}
 		} else {
